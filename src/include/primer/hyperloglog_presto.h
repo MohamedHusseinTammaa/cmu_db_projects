@@ -35,10 +35,10 @@ namespace bustub {
 
 template <typename KeyType>
 class HyperLogLogPresto {
-  /**
-   * INSTRUCTIONS: Testing framework will use the GetDenseBucket and GetOverflow function,
-   * hence SHOULD NOT be deleted. It's essential to use the dense_bucket_
-   * data structure.
+  /*
+    INSTRUCTIONS: Testing framework will use the GetDenseBucket and GetOverflow function,
+    hence SHOULD NOT be deleted. It's essential to use the dense_bucket_
+    data structure.
    */
 
   /** @brief Constant for HLL. */
@@ -90,7 +90,10 @@ class HyperLogLogPresto {
 
   /** @brief Storing cardinality value */
   uint64_t cardinality_;
-
+  int16_t number_of_bits;
+  int16_t number_of_buckets;
+  std::vector<int4_t>registers;
+  std::mutex mtx_;
   // TODO(student) - can add more data structures as required
 };
 

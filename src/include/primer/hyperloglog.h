@@ -71,6 +71,10 @@ class HyperLogLog {
 
   /** @brief Cardinality value. */
   size_t cardinality_;
+  int16_t number_of_bits;
+  int16_t number_of_buckets;
+  std::vector<uint64_t>registers;
+  std::mutex mtx_;
 
   /** @todo (student) can add their data structures that support HyperLogLog */
 };
