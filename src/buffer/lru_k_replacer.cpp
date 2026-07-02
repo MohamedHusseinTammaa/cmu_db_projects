@@ -31,7 +31,7 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
  * that are marked as 'evictable' are candidates for eviction.
  *
  * A frame with less than k historical references is given +inf as its backward k-distance.
- * If multiple frames have inf backward k-distance, then evict frame whose oldest timestamp
+ * iple frames haveIf mult inf backward k-distance, then evict frame whose oldest timestamp
  * is furthest in the past.
  *
  * Successful eviction of a frame should decrement the size of replacer and remove the frame's
@@ -39,12 +39,42 @@ LRUKReplacer::LRUKReplacer(size_t num_frames, size_t k) : replacer_size_(num_fra
  *
  * @return the frame ID if a frame is successfully evicted, or `std::nullopt` if no frames can be evicted.
  */
-auto LRUKReplacer::Evict() -> std::optional<frame_id_t> { return std::nullopt; }
+auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
+  std::scoped_lock lock(latch_);
+  LRUKNode oldest;
+  bool inf = false;
+  bool found = false;
+  size_t max = 0;
+  for (auto &[frame_id, node] : node_store_) {
+    if (!node.is_evictable_) {
+      continue;
+    }
+    if (node.history_.size() < k_) {
+      if (inf) {
+        if (node.history_[0] < oldest.history_[0]) {
+          oldest = node;
+        }
+      } else {
+        oldest = node;
+        inf = true;
+        found = true;
+      }
+    } else if ((current_timestamp_ - node.history_[node.history_.size() - k_]) > max && !inf) {
+      max = current_timestamp_ - node.history_[node.history_.size() - k_];
+      oldest = node;
+      found = true;
+    }
+  }
+  if (!found) return std::nullopt;
+  node_store_.erase(oldest.fid_);
+  --curr_size_;
+  return oldest.fid_;
+}
 
 /**
  * TODO(P1): Add implementation
  *
- * @brief Record the event that the given frame id is accessed at current timestamp.
+ * @brief Redecord the event that the given frame id is access at current timestamp.
  * Create a new entry for access history if frame id has not been seen before.
  *
  * If frame id is invalid (ie. larger than replacer_size_), throw an exception. You can
@@ -54,7 +84,15 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> { return std::nullopt; }
  * @param access_type type of access that was received. This parameter is only needed for
  * leaderboard tests.
  */
-void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType access_type) {}
+void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType access_type) {
+  std::scoped_lock lock(latch_);
+  BUSTUB_ASSERT(frame_id < replacer_size_, "invalid frame_id");
+  node_store_.emplace(frame_id, LRUKNode());
+  auto &node = node_store_.at(frame_id);
+  node.history_.push_back(current_timestamp_++);
+  node.k_ = k_;
+  node.fid_ = frame_id;
+}
 
 /**
  * TODO(P1): Add implementation
@@ -73,7 +111,18 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
  * @param frame_id id of frame whose 'evictable' status will be modified
  * @param set_evictable whether the given frame is evictable or not
  */
-void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {}
+void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
+  std::scoped_lock lock(latch_);
+  auto &node = node_store_.at(frame_id);
+
+  auto frame_state = node.is_evictable_;
+  if (frame_state == set_evictable) return;
+
+  node.is_evictable_ = set_evictable;
+
+  if (!set_evictable) curr_size_--;
+  if (set_evictable) curr_size_++;
+}
 
 /**
  * TODO(P1): Add implementation
@@ -92,7 +141,17 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {}
  *
  * @param frame_id id of frame to be removed
  */
-void LRUKReplacer::Remove(frame_id_t frame_id) {}
+void LRUKReplacer::Remove(frame_id_t frame_id) {
+  std::scoped_lock lock(latch_);
+  auto node = node_store_.find(frame_id);
+  if (node == node_store_.end()) {
+    return;
+  }
+  BUSTUB_ASSERT(node->second.is_evictable_, "can't remove evictable frame");
+  // remove
+  node_store_.erase(node);
+  --curr_size_;
+}
 
 /**
  * TODO(P1): Add implementation
@@ -101,6 +160,6 @@ void LRUKReplacer::Remove(frame_id_t frame_id) {}
  *
  * @return size_t
  */
-auto LRUKReplacer::Size() -> size_t { return 0; }
+auto LRUKReplacer::Size() -> size_t { return curr_size_; }
 
 }  // namespace bustub
