@@ -147,9 +147,12 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
 void LRUKReplacer::Remove(frame_id_t frame_id) {
   std::scoped_lock lock(latch_);
   auto it = node_store_.find(frame_id);
-  BUSTUB_ASSERT(it != node_store_.end(), "frame doesn't exist");
-
+  if (it == node_store_.end()) {
+    return;
+  }
   auto &node = it->second;
+  // non-evictable removal
+  BUSTUB_ASSERT(!node.is_evictable_, "cannot remove evictable frame ");
   // remove
   node_store_.erase(node.fid_);
   --curr_size_;
