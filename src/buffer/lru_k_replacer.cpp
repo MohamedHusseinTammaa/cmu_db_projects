@@ -113,8 +113,11 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
  */
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   std::scoped_lock lock(latch_);
+
+  BUSTUB_ASSERT(frame_id >= 0 && frame_id < replacer_size_, "invalid frame ID");
+
   auto it = node_store_.find(frame_id);
-  BUSTUB_ASSERT(it != node_store_.end(), "frame doesn't exist");
+  if (it == node_store_.end()) return;
 
   auto &node = it->second;
 
