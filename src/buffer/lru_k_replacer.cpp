@@ -113,7 +113,10 @@ void LRUKReplacer::RecordAccess(frame_id_t frame_id, [[maybe_unused]] AccessType
  */
 void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
   std::scoped_lock lock(latch_);
-  auto &node = node_store_.at(frame_id);
+  auto it = node_store_.find(frame_id);
+  BUSTUB_ASSERT(it != node_store_.end(), "frame doesn't exist");
+
+  auto &node = it->second;
 
   auto frame_state = node.is_evictable_;
   if (frame_state == set_evictable) return;
@@ -143,13 +146,12 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
  */
 void LRUKReplacer::Remove(frame_id_t frame_id) {
   std::scoped_lock lock(latch_);
-  auto node = node_store_.find(frame_id);
-  if (node == node_store_.end()) {
-    return;
-  }
-  BUSTUB_ASSERT(node->second.is_evictable_, "can't remove evictable frame");
+  auto it = node_store_.find(frame_id);
+  BUSTUB_ASSERT(it != node_store_.end(), "frame doesn't exist");
+
+  auto &node = it->second;
   // remove
-  node_store_.erase(node);
+  node_store_.erase(node.fid_);
   --curr_size_;
 }
 
