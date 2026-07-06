@@ -38,7 +38,11 @@ DiskScheduler::~DiskScheduler() {
  *
  * @param requests The requests to be scheduled.
  */
-void DiskScheduler::Schedule(std::vector<DiskRequest> &requests) {}
+void DiskScheduler::Schedule(std::vector<DiskRequest> &requests) {
+  for (size_t i = 0; i < requests.size(); i++) {
+    request_queue_.Put(std::move(requests[i]));
+  }
+}
 
 /**
  * TODO(P1): Add implementation
@@ -48,6 +52,18 @@ void DiskScheduler::Schedule(std::vector<DiskRequest> &requests) {}
  * The background thread needs to process requests while the DiskScheduler exists, i.e., this function should not
  * return until ~DiskScheduler() is called. At that point you need to make sure that the function does return.
  */
-void DiskScheduler::StartWorkerThread() {}
+void DiskScheduler::StartWorkerThread() {
+  while (true) {
+    auto element = request_queue_.Get();
+    if (!element) break;
+    auto &value = element.value();
+    if (value.is_write_) {
+      disk_manager_->WritePage(value.page_id_, value.data_);
+      value.callback_.set_value(true);
+    } else {
+      disk_manager_->ReadPage(value.page_id_, value.data_);
+      value.callback_.set_value(true);
+    }
+  }
 
 }  // namespace bustub
